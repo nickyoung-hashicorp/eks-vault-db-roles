@@ -11,6 +11,7 @@ The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f app
 
 In the mean time, open a new terminal tab and configure Vault on the EC2 instance.
 ```sh
+cd eks-vault-db-roles
 ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 sudo su
 apt update -y && apt install jq -y
@@ -18,7 +19,7 @@ apt update -y && apt install jq -y
 export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -format=json -key-shares=1 -key-threshold=1 > /home/ubuntu/init.json
 vault operator unseal $(cat /home/ubuntu/init.json | jq -r '.unseal_keys_b64[0]')
-cat init.json | jq -r '.root_token'
+cat init.json | jq -r '.root_token' # Copy and save this which you will need later
 exit
 ```
 
