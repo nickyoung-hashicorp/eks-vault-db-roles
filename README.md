@@ -3,8 +3,8 @@
 ## Deploy Vault, EKS, and AWS resources
 Clone repository and provision.
 ```sh
-git clone https://github.com/nickyoung-hashicorp/hcp-vault-eks-rds
-cd hcp-vault-eks-rds/v2
+git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
+cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
