@@ -159,8 +159,16 @@ resource "aws_instance" "vault" {
   tags = {
     Name = "${var.prefix}-vault-instance"
   }
+}
 
-    provisioner "file" {
+resource "null_resource" "configure-cat-app" {
+  depends_on = [aws_eip_association.vault]
+
+  triggers = {
+    build_number = timestamp()
+  }
+
+  provisioner "file" {
     source      = "files/"
     destination = "/home/ubuntu/"
 
