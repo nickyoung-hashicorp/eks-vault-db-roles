@@ -8,4 +8,6 @@ output "vault_ip" {
 }
 
 # Output RDS endpoint with port
-output "rds-endpoint" { value = aws_db_instance.rds.endpoint }
+output "rds-endpoint" {
+  value = aws_db_instance.rds.endpoint
+}
