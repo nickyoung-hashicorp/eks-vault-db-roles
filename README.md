@@ -11,7 +11,6 @@ The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f app
 
 In the mean time, open a new terminal tab and configure Vault on the EC2 instance.
 ```sh
-cd hcp-vault-eks-rds/v2
 ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 sudo su
 apt update -y && apt install jq -y
