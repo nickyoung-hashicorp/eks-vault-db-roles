@@ -159,18 +159,8 @@ resource "aws_instance" "vault" {
   tags = {
     Name = "${var.prefix}-vault-instance"
   }
-}
 
-# We're using a little trick here so we can run the provisioner without
-# destroying the VM. Do not do this in production.
-resource "null_resource" "configure-vault" {
-  depends_on = [aws_eip_association.vault]
-
-  # triggers = {
-  #   build_number = timestamp()
-  # }
-
-  provisioner "file" {
+    provisioner "file" {
     source      = "files/"
     destination = "/home/ubuntu/"
 
