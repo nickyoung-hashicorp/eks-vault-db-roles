@@ -60,7 +60,7 @@ chmod 700 get_helm.sh
 
 ### Remove files
 ```sh
-rm awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
+rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 ```
 
 ### Configure kubectl
@@ -73,6 +73,7 @@ aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
 ```sh
 kubectl get po -A
 ```
+If you see pods running in the `kube-system` namespace, you are ready to go.
 
 ### Install Vault Agent on EKS
 ```sh
@@ -116,7 +117,7 @@ git clone https://github.com/hashicorp/vault-guides.git
 cd vault-guides/cloud/eks-hcp-vault/
 ```
 
-### Deploy Postgres database and check for `RUNNING` status
+### Deploy `postgres-*` database pod and check for `RUNNING` status
 ```sh
 kubectl apply -f postgres.yaml
 kubectl get po
@@ -166,23 +167,24 @@ vault write auth/kubernetes/role/product \
 ### Edit `product.yaml`
 ```sh
 vim product.yaml
-# remove line 39 or the annotation that mentions the namespace `vault.hashicorp.com/namespace: "admin"`
+# find the annotation that mentions the namespace `vault.hashicorp.com/namespace: "admin"` and delete that line
 ```
 
-### Deploy `product` pod and check for `RUNNING` status
+### Deploy `product-*` pod and check for `RUNNING` status
 ```sh
 kubectl apply -f product.yaml
 kubectl get po
 ```
 
-### Open new terminal and port forward the web service
+### Exec into the pod and observe that the credentials dynamically change every ~30s
 ```sh
-kubectl port-forward service/product 9090
+PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
+watch -n 1 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
 
-### Return to 1st terminal and test
+### Clean up Database Secrets Engine
 ```sh
-curl -s localhost:9090/coffees | jq .
+vault secrets disable database
 ```
 
 ### Delete pods
@@ -191,11 +193,12 @@ kubectl delete -f product.yaml
 kubectl delete -f postgres.yaml
 ```
 
-## Static Roles
+## Configure Static Database Roles
 
 ### Deploy Postgres database
 ```sh
 kubectl apply -f postgres.yaml
+kubectl get po
 ```
 
 ### Exec into `postgres-*` pod
@@ -216,7 +219,7 @@ psql -U postgres -c "\du"
 # Exit pod
 exit
 ```
-## Configure Static Database Roles
+<!-- ## Configure Static Database Roles
 ```sh
 vault auth enable kubernetes
 export TOKEN_REVIEW_JWT=$(kubectl get secret \
@@ -233,7 +236,7 @@ vault write auth/kubernetes/config \
    kubernetes_ca_cert="$KUBE_CA_CERT"
 ```
 
-## Enable and add database role
+## Enable and add database role -->
 
 ### Enable and configure database secrets engine
 ```sh
@@ -253,18 +256,18 @@ vault write database/config/postgresql \
 cat > rotation.sql << EOF
 ALTER USER "{{name}}" WITH PASSWORD '{{password}}';
 EOF
-vault write database/static-roles/postgresql \
-    db_name=products \
+vault write database/static-roles/product \
+    db_name=postgresql \
     rotation_statements=@rotation.sql \
     username="static-vault-user" \
     rotation_period=30
-vault read database/static-creds/postgresql
+vault read database/static-creds/product
 ```
 
 ## Create policy and assocate with auth method
 ```sh
 cat > product.hcl << EOF
-path "database/static-creds/postgresql" {
+path "database/static-creds/product" {
   capabilities = ["read"]
 }
 EOF
@@ -317,11 +320,11 @@ spec:
       annotations:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "product"
-        vault.hashicorp.com/agent-inject-secret-conf.json: "database/static-creds/postgresql"
+        vault.hashicorp.com/agent-inject-secret-conf.json: "database/static-creds/product"
         vault.hashicorp.com/agent-inject-template-conf.json: |
           {
             "bind_address": ":9090",
-            {{ with secret "database/static-creds/postgresql" -}}
+            {{ with secret "database/static-creds/product" -}}
             "db_connection": "host=${POSTGRES_IP} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
             {{- end }}
           }
@@ -346,7 +349,7 @@ spec:
 EOF
 ```
 
-### Check that the `host` value rendered properly with the FQDN record
+### Check that the `host` value rendered properly with the AWS FQDN record
 ```sh
 more static-product.yaml | grep host
 ```
