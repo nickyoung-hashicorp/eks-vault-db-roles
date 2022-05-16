@@ -19,8 +19,9 @@ apt update -y && apt install jq -y
 export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -format=json -key-shares=1 -key-threshold=1 > /home/ubuntu/init.json
 vault operator unseal $(cat /home/ubuntu/init.json | jq -r '.unseal_keys_b64[0]')
-cat init.json | jq -r '.root_token' # Copy and save this which you will need later
-exit
+cat init.json | jq -r '.root_token' # Copy and save this root token for later.
+exit # as root
+exit # the EC2 instance
 ```
 
 ### Install Vault on workstation
@@ -28,8 +29,8 @@ exit
 export VAULT_VERSION=1.10.3 # Choose your desired Vault version
 wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
 unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
-export VAULT_TOKEN=hvs.B1CloLDutkyv1bb9MEQILeJw
-export VAULT_ADDR=http://54.203.106.170:8200
+export VAULT_TOKEN=<root_token>
+export VAULT_ADDR=http://$(terraform output vault_ip):8200
 ```
 
 ### Define AWS region
