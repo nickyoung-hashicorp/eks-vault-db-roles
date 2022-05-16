@@ -33,7 +33,7 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly-EK
 
 ## Create the EKS cluster
 resource "aws_eks_cluster" "k8squickstart-eks" {
-  name = "k8squickstart-cluster"
+  name     = "k8squickstart-cluster"
   role_arn = aws_iam_role.eks-iam-role.arn
 
   vpc_config {
@@ -86,7 +86,7 @@ resource "aws_eks_node_group" "worker-node-group" {
   node_group_name = "k8squickstart-workernodes"
   node_role_arn   = aws_iam_role.workernodes.arn
   subnet_ids      = [aws_subnet.a.id, aws_subnet.b.id]
-  instance_types = ["t3.xlarge"]
+  instance_types  = ["t3.xlarge"]
 
   scaling_config {
     desired_size = 2

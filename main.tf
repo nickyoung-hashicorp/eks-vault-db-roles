@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.region
+  region = var.region
 }
 
 resource "aws_vpc" "this" {
@@ -21,9 +21,9 @@ resource "aws_vpc" "this" {
 }
 
 resource "aws_subnet" "a" {
-  vpc_id     = aws_vpc.this.id
-  cidr_block = var.subnet_prefix_a
-  availability_zone  = "us-west-2a"
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = var.subnet_prefix_a
+  availability_zone       = "us-west-2a"
   map_public_ip_on_launch = true
 
   tags = {
@@ -32,9 +32,9 @@ resource "aws_subnet" "a" {
 }
 
 resource "aws_subnet" "b" {
-  vpc_id     = aws_vpc.this.id
-  cidr_block = var.subnet_prefix_b
-  availability_zone  = "us-west-2b"
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = var.subnet_prefix_b
+  availability_zone       = "us-west-2b"
   map_public_ip_on_launch = true
 
   tags = {
@@ -126,7 +126,7 @@ data "aws_ami" "ubuntu" {
   most_recent = true
 
   filter {
-    name = "name"
+    name   = "name"
     values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
   }
 
