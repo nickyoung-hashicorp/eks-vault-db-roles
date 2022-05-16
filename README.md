@@ -10,9 +10,16 @@ terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.lo
 The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
 
 In the mean time, open a new terminal tab and configure Vault on the EC2 instance.
+
+### Configure Vault
+Open a new terminal session and SSH to the EC2 instance:
 ```sh
 cd eks-vault-db-roles
 ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
+```
+
+Install Vault:
+```sh
 sudo su
 apt update -y && apt install jq -y
 ./install_vault.sh
@@ -20,11 +27,13 @@ export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -format=json -key-shares=1 -key-threshold=1 > /home/ubuntu/init.json
 vault operator unseal $(cat /home/ubuntu/init.json | jq -r '.unseal_keys_b64[0]')
 cat init.json | jq -r '.root_token' # Copy and save this root token for later.
-exit # as root
+exit # from root
 exit # the EC2 instance
 ```
 
-### Install Vault on workstation
+## Setup Workstation
+
+Install Vault:
 ```sh
 export VAULT_VERSION=1.10.3 # Choose your desired Vault version
 wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
@@ -33,43 +42,36 @@ export VAULT_TOKEN=<root_token>
 export VAULT_ADDR=http://$(terraform output vault_ip):8200
 ```
 
-### Define AWS region
+Setup local environment
 ```sh
+# Define AWS region
 export AWS_DEFAULT_REGION=us-west-2
-```
 
-### Install awscli
-```sh
+# Install awscli
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
-```
 
-### Install kubectl
-```sh
+# Install kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-```
 
-### Install Helm
-```sh
+# Install Helm
 curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 > get_helm.sh
 chmod 700 get_helm.sh
 ./get_helm.sh
-```
 
-### Remove files
-```sh
+# Remove files
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 ```
 
-### Configure kubectl
+Configure `kubectl`
 ```sh
 export EKS_CLUSTER=k8squickstart-cluster
 aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
 ```
 
-### Test K8s cluster
+Test EKS cluster
 ```sh
 kubectl get po -A
 ```
@@ -365,11 +367,20 @@ kubectl get po
 PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
 watch -n 1 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
+Hit `Ctrl+C` to stop.
 
-### Open another terminal and watch the countdown of the static credential.  When the password is rotated, the `product-*` pod's database password is changed at the same time
+### `Optional`: Open another terminal and watch the countdown of the static credential.  When the password is rotated, the database password rendered i the `product-*` pod  is changed at the same time
 ```
 watch -n 1 vault read database/static-creds/postgresql
 ```
+Hit `Ctrl+C` to stop and close terminal.
+
+## Clean Up
+```sh
+cd ../../..
+nohup terraform apply -auto-approve -parallelism=20 > apply.log &
+```
+Run `tail -f apply.log` to view the progress of the destroy
 
 ## Supporting docs
 https://www.vaultproject.io/docs/agent/template#static-roles, specifically as it pertains to Static Roles, `If a secret has a rotation_period, such as a database static role, Vault Agent template will fetch the new secret as it changes in Vault. It does this by inspecting the secret's time-to-live (TTL).`
