@@ -9,7 +9,7 @@ terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.lo
 ```
 The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
 
-In the mean time, open a new terminal tab and configure Vault on the EC2 instance.
+Once the `null-resource.configure-vault` process appears finished, open a new terminal tab and configure Vault on the EC2 instance.
 
 ### Configure Vault
 Open a new terminal session and SSH to the EC2 instance:
@@ -64,6 +64,7 @@ chmod 700 get_helm.sh
 # Remove files
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 ```
+Return to your first terminal session and see if the apply is complete and your EKS cluster is provisioned before proceeding.
 
 Configure `kubectl`
 ```sh

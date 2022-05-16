@@ -161,7 +161,7 @@ resource "aws_instance" "vault" {
   }
 }
 
-resource "null_resource" "configure-cat-app" {
+resource "null_resource" "configure-vault" {
   depends_on = [aws_eip_association.vault]
 
   triggers = {
