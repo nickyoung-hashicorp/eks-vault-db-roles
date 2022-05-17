@@ -1,8 +1,9 @@
-# Outputs file
+# SSH to Vault instance
 output "vault_ssh" {
   value = "ssh -i ssh-key.pem ubuntu@${aws_eip.vault.public_ip}"
 }
 
+# Vault IP
 output "vault_ip" {
   value = aws_eip.vault.public_ip
 }
