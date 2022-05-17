@@ -7,7 +7,7 @@ output "vault_ip" {
   value = aws_eip.vault.public_ip
 }
 
-# Output RDS endpoint with port
-output "rds-endpoint" {
+# Output RDS address
+output "rds-address" {
   value = aws_db_instance.rds.address
 }
