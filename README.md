@@ -144,6 +144,7 @@ Add database role to Vault
 vault secrets enable database
 export POSTGRES_IP=$(kubectl get service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
    postgres)
+echo $POSTGRES_IP
 vault write database/config/products \
     plugin_name=postgresql-database-plugin \
     allowed_roles="*" \
