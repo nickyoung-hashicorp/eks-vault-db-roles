@@ -189,7 +189,7 @@ vim product.yaml
 
 ### Deploy `product-*` pod and check for `RUNNING` status
 ```sh
-kubectl apply -f product.yaml
+kubectl apply -f ./yaml/product.yaml
 kubectl get po
 ```
 
