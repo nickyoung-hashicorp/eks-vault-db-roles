@@ -14,22 +14,24 @@ git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
-The EKS cluster can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
-
-Once the `null-resource.configure-vault` process appears finished, open a new terminal tab and configure Vault on the EC2 instance.
+The EKS cluster and RDS database can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
 
 ### Configure Vault
-Open a new terminal session and SSH to the EC2 instance:
+SSH to the EC2 instance
 ```sh
-cd eks-vault-db-roles
 ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 ```
 
-Install Vault:
+Update packages and install `jq`
 ```sh
 sudo su
 apt update -y && apt install jq -y
+```
+
+Install Vault
+```sh
 ./install_vault.sh
+sleep 5
 export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -format=json -key-shares=1 -key-threshold=1 > /home/ubuntu/init.json
 vault operator unseal $(cat /home/ubuntu/init.json | jq -r '.unseal_keys_b64[0]')
@@ -40,13 +42,18 @@ exit # the EC2 instance
 
 ## Setup Workstation
 
-Install Vault:
+Install Vault to use the CLI
 ```sh
 export VAULT_VERSION=1.10.3 # Choose your desired Vault version
 wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
 unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
-export VAULT_TOKEN=<root_token>
+```
+
+Replace `<root_token>` with the token you copied earlier
+```sh
+export VAULT_TOKEN=<root_token> # Replace with your root token
 export VAULT_ADDR=http://$(terraform output vault_ip):8200
+echo $VAULT_ADDR # to check that the public IP of Vault was saved properly
 ```
 
 Setup local environment
@@ -71,11 +78,10 @@ chmod 700 get_helm.sh
 # Remove files
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 ```
-Return to your first terminal session and see if the apply is complete and your EKS cluster is provisioned before proceeding.
 
 Configure `kubectl`
 ```sh
-export EKS_CLUSTER=k8squickstart-cluster
+export EKS_CLUSTER=eks-rds-demo
 aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
 ```
 
@@ -85,7 +91,9 @@ kubectl get po -A
 ```
 If you see pods running in the `kube-system` namespace, you are ready to go.
 
-### Install Vault Agent on EKS using Helm
+## Install Vault Agent
+
+Install the Vault Agent on EKS using Helm
 ```sh
 helm repo add hashicorp https://helm.releases.hashicorp.com && helm repo update
 cat > values.yaml << EOF
@@ -93,18 +101,19 @@ injector:
    enabled: true
    externalVaultAddr: "${VAULT_ADDR}"
 EOF
-more values.yaml
+more values.yaml # to ensure Vault's public IP rendered properly
 helm install vault -f values.yaml hashicorp/vault --version "0.19.0"
 ```
 
-### Check `vault-agent-injector-*` pod for `RUNNING` status
+Check `vault-agent-injector-*` pod for `RUNNING` status
 ```sh
-kubectl get po
+watch kubectl get po
 ```
+Hit `Ctrl+C` to stop watching.
 
 ## Configure Dynamic Database Credentials
 
-### Configure Kubernetes Auth Method on Vault
+Configure Kubernetes Auth Method on Vault
 ```sh
 vault auth enable kubernetes
 export TOKEN_REVIEW_JWT=$(kubectl get secret \
@@ -121,19 +130,16 @@ vault write auth/kubernetes/config \
    kubernetes_ca_cert="$KUBE_CA_CERT"
 ```
 
-### Deploy example workload with Postgres database
+Deploy `postgres-*` database pod and check for `RUNNING` status
 ```sh
-git clone https://github.com/hashicorp/vault-guides.git
-cd vault-guides/cloud/eks-hcp-vault/
+kubectl apply -f ./yaml/postgres.yaml
+watch kubectl get po
 ```
+Hit `Ctrl+C` to stop watching.
 
-### Deploy `postgres-*` database pod and check for `RUNNING` status
-```sh
-kubectl apply -f postgres.yaml
-kubectl get po
-```
+# SOMETHING IS BROKEN IN CONFIGURING THE DATABASE
 
-### Add database role to Vault
+Add database role to Vault
 ```sh
 vault secrets enable database
 export POSTGRES_IP=$(kubectl get service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \

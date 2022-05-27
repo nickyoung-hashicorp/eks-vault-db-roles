@@ -33,7 +33,7 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly-EK
 
 ## Create the EKS cluster
 resource "aws_eks_cluster" "k8squickstart-eks" {
-  name     = "k8squickstart-cluster"
+  name     = "eks-rds-demo"
   role_arn = aws_iam_role.eks-iam-role.arn
 
   vpc_config {

@@ -169,7 +169,7 @@ resource "null_resource" "configure-vault" {
   }
 
   provisioner "file" {
-    source      = "files/"
+    source      = "scripts/"
     destination = "/home/ubuntu/"
 
     connection {
