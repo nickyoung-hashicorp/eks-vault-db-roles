@@ -181,16 +181,10 @@ vault write auth/kubernetes/role/product \
     ttl=1h
 ```
 
-### Edit `product.yaml`
-```sh
-vim product.yaml
-# find the annotation that mentions the namespace `vault.hashicorp.com/namespace: "admin"` and delete that line
-```
-
-### Deploy `product-*` pod and check for `RUNNING` status
+Deploy the `product-*` pod and check for `RUNNING` status
 ```sh
 kubectl apply -f ./yaml/product.yaml
-kubectl get po
+watch kubectl get po
 ```
 
 ### Exec into the pod and observe that the credentials dynamically change every ~20s
