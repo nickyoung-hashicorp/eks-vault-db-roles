@@ -44,7 +44,6 @@ spec:
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
               name: "pgdata"
-      dnsPolicy: Default
       volumes:
         - name: pgdata
           emptyDir: {}
