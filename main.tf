@@ -187,6 +187,7 @@ resource "null_resource" "configure-vault" {
       "sudo apt -y update",
       "sudo apt install unzip wget -y",
       "chmod +x *.sh",
+      "sudo sed -i 's/#   StrictHostKeyChecking ask/StrictHostKeyChecking no/g' /etc/ssh/ssh_config",
     ]
 
     connection {

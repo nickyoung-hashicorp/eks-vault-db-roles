@@ -14,7 +14,7 @@ git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
-The EKS cluster and RDS database can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the apply.
+The EKS cluster and RDS database can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
 
 ### Configure Vault
 SSH to the EC2 instance
@@ -35,12 +35,17 @@ sleep 5
 export VAULT_ADDR=http://127.0.0.1:8200
 vault operator init -format=json -key-shares=1 -key-threshold=1 > /home/ubuntu/init.json
 vault operator unseal $(cat /home/ubuntu/init.json | jq -r '.unseal_keys_b64[0]')
-cat init.json | jq -r '.root_token' # Copy and save this root token for later.
+cat init.json | jq -r '.root_token' > root_token # Copy and save this root token for later.
 exit # from root
 exit # the EC2 instance
 ```
 
-## Setup Workstation
+Copy root token from the EC2 instance to the local workstation
+```sh
+scp -i ssh-key.pem ubuntu@$(terraform output vault_ip):/home/ubuntu/root_token .
+```
+
+## Setup Local Workstation
 
 Install Vault to use the CLI
 ```sh
@@ -51,8 +56,9 @@ unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
 
 Replace `<root_token>` with the token you copied earlier
 ```sh
-export VAULT_TOKEN=<root_token> # Replace with your root token
+export VAULT_TOKEN=$(cat root_token)
 export VAULT_ADDR=http://$(terraform output vault_ip):8200
+echo $VAULT_TOKEN # to check that the root token was saved properly
 echo $VAULT_ADDR # to check that the public IP of Vault was saved properly
 ```
 
@@ -77,16 +83,12 @@ chmod 700 get_helm.sh
 
 # Remove files
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
-```
 
-Configure `kubectl`
-```sh
+# Configure `kubectl`
 export EKS_CLUSTER=eks-rds-demo
 aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
-```
 
-Test EKS cluster
-```sh
+# Test EKS cluster
 kubectl get po -A
 ```
 If you see pods running in the `kube-system` namespace, you are ready to go.
@@ -107,9 +109,8 @@ helm install vault -f values.yaml hashicorp/vault --version "0.19.0"
 
 Check `vault-agent-injector-*` pod for `RUNNING` status
 ```sh
-watch kubectl get po
+kubectl wait po --for=condition=Ready -l app.kubernetes.io/instance=vault
 ```
-Hit `Ctrl+C` to stop watching.
 
 ## Configure Dynamic Database Credentials
 
@@ -128,14 +129,15 @@ vault write auth/kubernetes/config \
    token_reviewer_jwt="$TOKEN_REVIEW_JWT" \
    kubernetes_host="$KUBE_HOST" \
    kubernetes_ca_cert="$KUBE_CA_CERT"
+
 ```
 
 Deploy `postgres-*` database pod and check for `RUNNING` status
 ```sh
 kubectl apply -f ./yaml/postgres.yaml
-watch kubectl get po
+kubectl wait po --for=condition=Ready -l app=postgres
+
 ```
-Hit `Ctrl+C` to stop watching.
 
 # SOMETHING IS BROKEN IN CONFIGURING THE DATABASE
 
