@@ -45,16 +45,6 @@ resource "aws_eks_cluster" "eks" {
   ]
 }
 
-## Create security group rule permitting all traffic
-resource "aws_security_group_rule" "eks" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = "all"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_eks_cluster.eks.vpc_config.cluster_security_group_id
-}
-
 ## Worker Nodes
 resource "aws_iam_role" "workernodes" {
   name = "eks-node-group-example"

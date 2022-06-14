@@ -13,7 +13,7 @@ Clone repository and provision.
 git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
-sleep 3
+sleep 5
 tail -f apply.log
 
 ```
