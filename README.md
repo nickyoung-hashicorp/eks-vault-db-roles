@@ -164,7 +164,7 @@ vault write database/roles/product \
         GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
     revocation_statements="ALTER ROLE \"{{name}}\" NOLOGIN;"\
     default_ttl="20s" \
-    max_ttl="60s"
+    max_ttl="20s"
 ```
 If this fails with an error that looks like `* error creating database object: error verifying connection: dial tcp: lookup a986ca57f20914c29b53f61ff0b7d960-2128898780.us-west-2.elb.amazonaws.com on 127.0.0.53:53: no such host`, check the EKS security group and open all inbound traffic from anywhere to quickly allow the connection.
 
@@ -191,14 +191,17 @@ vault write auth/kubernetes/role/product \
 Deploy the `product-*` pod and check for `RUNNING` status
 ```sh
 kubectl apply -f ./yaml/product.yaml
-watch kubectl get po
+kubectl wait po --for=condition=Ready -l app=product
+
 ```
 
 ### Exec into the pod and observe that the credentials dynamically change every ~20s
 ```sh
 PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
+
+# Ensure that the proper `product-` pod is saved
 echo $PRODUCT_POD
-watch -n 1 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
+watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
 
 ### Clean up Database Secrets Engine
@@ -206,11 +209,11 @@ watch -n 1 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 vault secrets disable database
 ```
 
-<!-- ### Delete pods
+### Delete pods
 ```sh
 kubectl delete -f product.yaml
 kubectl delete -f postgres.yaml
-``` -->
+```
 
 ## Configure Static Database Roles
 
@@ -239,7 +242,7 @@ psql -U postgres -c "\du"
 # Exit pod
 exit
 ```
-<!-- ## Configure Static Database Roles
+## Configure Static Database Roles
 ```sh
 vault auth enable kubernetes
 export TOKEN_REVIEW_JWT=$(kubectl get secret \
@@ -270,7 +273,7 @@ vault write database/config/postgresql \
     connection_url="postgresql://{{username}}:{{password}}@${POSTGRES_IP}:5432/products?sslmode=disable" \
     username="postgres" \
     password="password"
-``` -->
+```
 
 ### Create a static role
 ```sh
