@@ -34,7 +34,6 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly-EK
 ## Create the EKS cluster
 resource "aws_eks_cluster" "eks" {
   name     = "eks-rds-demo"
-  endpoint_private_access = true
   role_arn = aws_iam_role.eks-iam-role.arn
 
   vpc_config {
