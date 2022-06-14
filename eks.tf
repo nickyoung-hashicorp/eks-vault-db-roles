@@ -1,6 +1,6 @@
 # IAM Role for EKS to have access to the appropriate resources
 resource "aws_iam_role" "eks-iam-role" {
-  name = "k8squickstart-eks-iam-role"
+  name = "eks-iam-role"
 
   path = "/"
 
@@ -32,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly-EK
 }
 
 ## Create the EKS cluster
-resource "aws_eks_cluster" "k8squickstart-eks" {
+resource "aws_eks_cluster" "eks" {
   name     = "eks-rds-demo"
   role_arn = aws_iam_role.eks-iam-role.arn
 
@@ -43,6 +43,16 @@ resource "aws_eks_cluster" "k8squickstart-eks" {
   depends_on = [
     aws_iam_role.eks-iam-role,
   ]
+}
+
+## Create security group rule permitting all traffic
+resource "aws_security_group_rule" "eks" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = "all"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_eks_cluster.eks.vpc_config.cluster_security_group_id
 }
 
 ## Worker Nodes
@@ -82,7 +92,7 @@ resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerRegistryReadOnly" {
 }
 
 resource "aws_eks_node_group" "worker-node-group" {
-  cluster_name    = aws_eks_cluster.k8squickstart-eks.name
+  cluster_name    = aws_eks_cluster.eks.name
   node_group_name = "k8squickstart-workernodes"
   node_role_arn   = aws_iam_role.workernodes.arn
   subnet_ids      = [aws_subnet.a.id, aws_subnet.b.id]

@@ -13,8 +13,11 @@ Clone repository and provision.
 git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
+sleep 3
+tail -f apply.log
+
 ```
-The EKS cluster and RDS database can take 15-20 minutes to provision, so you can run `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
+The EKS cluster and RDS database can take 15-20 minutes to provision, so we're running `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
 
 ### Configure Vault
 SSH to the EC2 instance
