@@ -35,7 +35,9 @@ cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 
-The EKS cluster and RDS database can take 15-20 minutes to provision, so can run `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
+The EKS cluster and RDS database can take 15-20 minutes to provision, so can run `tail -f apply.log` to check on the real-time status of the apply after you see the `nohup: ignoring input and redirecting stderr to stdout` message in the terminal.
+
+Press `Ctrl+C` to cancel out of the `tail` command once the apply is complete.
 
 ## Configure Vault
 
@@ -131,18 +133,18 @@ kubectl apply -f ../yaml/postgres.yaml
 kubectl wait po --for=condition=Ready -l app=postgres
 ```
 
-Add database role to Vault
+Configure dynamic database role in Vault
 ```
 ./configure_dynamic_role.sh
 ```
 If this fails with an error that looks like `* error creating database object: error verifying connection: dial tcp: lookup a986ca57f20914c29b53f61ff0b7d960-2128898780.us-west-2.elb.amazonaws.com on 127.0.0.53:53: no such host`, you can create a security group associated with the EKS cluster that allows inbound traffic from anywhere to quickly allow the connection.
 
-### Test generating dynamic credentials
+Test generating dynamic credentials
 ```
 vault read database/creds/product
 ```
 
-### Configure Vault policy
+Configure Vault policy
 ```
 ./configure_dynamic_policy.sh
 ```
@@ -170,7 +172,6 @@ watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 Clean up Database Secrets Engine and Kubernetes Auth Method
 ```
 vault secrets disable database
-vault auth disable kubernetes
 ```
 
 Delete pods
@@ -184,7 +185,7 @@ Demonstrate Static Roles within EKS
 
 Deploy Postgres database
 ```
-kubectl apply -f ./yaml/postgres.yaml
+kubectl apply -f ../yaml/postgres.yaml
 kubectl wait po --for=condition=Ready -l app=postgres
 ```
 
@@ -197,33 +198,155 @@ kubectl exec --stdin --tty $PG_POD -- /bin/bash
 
 Setup static user for Vault
 ```
-# Setup Static database credential
+echo "Setup Static database credential"
 export PGPASSWORD=password
 psql -U postgres -c "CREATE ROLE \"static-vault-user\" WITH LOGIN PASSWORD 'password';"
 
-# Grant associated privileges for the role
+echo "Grant associated privileges for the role"
 psql -U postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"static-vault-user\";"
 
-# Confirm role attributes
+echo "Confirm role attributes"
 psql -U postgres -c "\du"
 
-# Exit pod
+echo "Exit the pod"
 exit
 ```
 
-Enable Kubernetes authentication method
+Configure dynamic database role in Vault
 ```
-vault auth enable kubernetes
-export TOKEN_REVIEW_JWT=$(kubectl get secret \
-   $(kubectl get serviceaccount vault -o jsonpath='{.secrets[0].name}') \
-   -o jsonpath='{ .data.token }' | base64 --decode)
-export KUBE_CA_CERT=$(kubectl get secret \
-   $(kubectl get serviceaccount vault -o jsonpath='{.secrets[0].name}') \
-   -o jsonpath='{ .data.ca\.crt }' | base64 --decode)
-export KUBE_HOST=$(kubectl config view --raw --minify --flatten \
-   -o jsonpath='{.clusters[].cluster.server}')
-vault write auth/kubernetes/config \
-   token_reviewer_jwt="$TOKEN_REVIEW_JWT" \
-   kubernetes_host="$KUBE_HOST" \
-   kubernetes_ca_cert="$KUBE_CA_CERT"
+./configure_static_role.sh
 ```
+
+Test viewing the static credentials
+```
+vault read database/static-creds/product
+```
+
+Configure Vault policy
+```
+./configure_static_policy.sh
+```
+
+Generate a new `static-product.yaml` file
+```
+cat > product-static.yaml << EOF
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product
+spec:
+  selector:
+    app: product
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product
+  labels:
+    app: product
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product
+  template:
+    metadata:
+      labels:
+        app: product
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "product-static"
+        vault.hashicorp.com/agent-inject-secret-conf.json: "database/static-creds/product"
+        vault.hashicorp.com/agent-inject-template-conf.json: |
+          {
+            "bind_address": ":9090",
+            {{ with secret "database/static-creds/product" -}}
+            "db_connection": "host=${POSTGRES_IP} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
+            {{- end }}
+          }
+    spec:
+      serviceAccountName: product
+      containers:
+        - name: product
+          image: hashicorpdemoapp/product-api:v0.0.14
+          ports:
+            - containerPort: 9090
+          env:
+            - name: "CONFIG_FILE"
+              value: "/vault/secrets/conf.json"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+            periodSeconds: 10
+            failureThreshold: 30
+EOF
+```
+
+Check that the `host` value rendered properly with the AWS FQDN record
+```
+more product-static.yaml | grep host
+```
+
+Deploy the product service with the static database role
+```
+kubectl apply -f product-static.yaml
+kubectl wait po --for=condition=Ready -l app=product
+```
+
+Observe how the database password in the `product-` pod dynamically changes every 30 seconds
+```
+PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
+echo $PRODUCT_POD
+watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
+```
+Press `Ctrl+C` to stop.
+
+Optional: Open a second terminal and watch the countdown of the static credential.  When the password is rotated, the database psasword rendered in the `product-` pod is chnaged at the same time
+```
+watch -n 2 vault read database/static-creds/postgresql
+```
+Press `Ctrl+C` to stop and return to the first terminal.
+
+Database Credentials from EKS Pod to RDS
+========================================
+cd ../
+Generate an ExternalName service definition
+```
+export RDS_ADDR=$(terraform output rds-address)
+cat > rds-postgres.yaml << EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: rds-postgres
+spec:
+  type: ExternalName
+  externalName: ${RDS_ADDR}
+EOF
+```
+
+Check to ensure the RDS endpoint rendered properly in the YAML definition
+```
+more rds-postgres.yaml
+```
+
+Deploy the `ExternalName` service
+```
+kubectl apply -f rds-postgres.yaml
+kubectl get svc
+```
+

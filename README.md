@@ -379,7 +379,6 @@ more product-static.yaml | grep host
 
 ### Deploy the product service with the static database role
 ```sh
-kubectl delete -f product.yaml
 kubectl apply -f product-static.yaml
 kubectl get po
 ```
@@ -388,7 +387,7 @@ kubectl get po
 ```sh
 PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
 echo $PRODUCT_POD
-watch -n 1 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
+watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
 Hit `Ctrl+C` to stop.
 
