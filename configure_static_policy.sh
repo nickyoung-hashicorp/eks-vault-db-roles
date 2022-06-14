@@ -1,5 +1,5 @@
 cat > product-static.hcl << EOF
-path "database/static-creds/product" {
+path "database/static-creds/product-static" {
   capabilities = ["read"]
 }
 EOF

@@ -156,7 +156,7 @@ Deploy Postgres Pod, Configure DB Secrets Engine
 
 Deploy `postgres-*` database pod and check for `RUNNING` status
 ```
-kubectl apply -f ../yaml/postgres.yaml
+kubectl apply -f ./yaml/postgres.yaml
 kubectl wait po --for=condition=Ready -l app=postgres
 ```
 
@@ -181,7 +181,7 @@ Demonstrate Dynamic Database Credentials within EKS
 
 Deploy the `product-*` pod and check for `RUNNING` status
 ```
-kubectl apply -f ../yaml/product.yaml
+kubectl apply -f ./yaml/product.yaml
 kubectl wait po --for=condition=Ready -l app=product
 ```
 
@@ -195,16 +195,17 @@ Exec into the pod and observe that the credentials dynamically change every ~20s
 ```
 watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
+Press `Ctrl+C` to stop.
 
-Clean up Database Secrets Engine and Kubernetes Auth Method
+Clean up Database Secrets Engine
 ```
 vault secrets disable database
 ```
 
 Delete pods
 ```
-kubectl delete -f ../yaml/product.yaml --grace-period 0 --force
-kubectl delete -f ../yaml/postgres.yaml --grace-period 0 --force
+kubectl delete -f ./yaml/product.yaml
+kubectl delete -f ./yaml/postgres.yaml
 ```
 
 Demonstrate Static Roles within EKS
@@ -212,7 +213,7 @@ Demonstrate Static Roles within EKS
 
 Deploy Postgres database
 ```
-kubectl apply -f ../yaml/postgres.yaml
+kubectl apply -f ./yaml/postgres.yaml
 kubectl wait po --for=condition=Ready -l app=postgres
 ```
 
@@ -225,17 +226,19 @@ kubectl exec --stdin --tty $PG_POD -- /bin/bash
 
 Setup static user for Vault
 ```
-echo "Setup Static database credential"
+# Setup Static database credential
 export PGPASSWORD=password
+
 psql -U postgres -c "CREATE ROLE \"static-vault-user\" WITH LOGIN PASSWORD 'password';"
 
-echo "Grant associated privileges for the role"
+# Grant associated privileges for the role
+
 psql -U postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"static-vault-user\";"
 
-echo "Confirm role attributes"
+# Confirm role attributes
 psql -U postgres -c "\du"
 
-echo "Exit the pod"
+# Exit the pod
 exit
 ```
 
@@ -246,7 +249,7 @@ Configure dynamic database role in Vault
 
 Test viewing the static credentials
 ```
-vault read database/static-creds/product
+vault read database/static-creds/product-static
 ```
 
 Configure Vault policy
@@ -254,7 +257,7 @@ Configure Vault policy
 ./configure_static_policy.sh
 ```
 
-Generate a new `static-product.yaml` file
+Generate a new `product-static.yaml` file
 ```
 cat > product-static.yaml << EOF
 ---
@@ -280,18 +283,18 @@ automountServiceAccountToken: true
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product
+  name: product-static
   labels:
-    app: product
+    app: product-static
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: product
+      app: product-static
   template:
     metadata:
       labels:
-        app: product
+        app: product-static
       annotations:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "product-static"
@@ -299,7 +302,7 @@ spec:
         vault.hashicorp.com/agent-inject-template-conf.json: |
           {
             "bind_address": ":9090",
-            {{ with secret "database/static-creds/product" -}}
+            {{ with secret "database/static-creds/product-static" -}}
             "db_connection": "host=${POSTGRES_IP} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
             {{- end }}
           }
@@ -332,7 +335,7 @@ more product-static.yaml | grep host
 Deploy the product service with the static database role
 ```
 kubectl apply -f product-static.yaml
-kubectl wait po --for=condition=Ready -l app=product
+kubectl wait po --for=condition=Ready -l app=product-static
 ```
 
 Observe how the database password in the `product-` pod dynamically changes every 30 seconds
@@ -345,13 +348,61 @@ Press `Ctrl+C` to stop.
 
 Optional: Open a second terminal and watch the countdown of the static credential.  When the password is rotated, the database psasword rendered in the `product-` pod is chnaged at the same time
 ```
-watch -n 2 vault read database/static-creds/postgresql
+watch -n 2 vault read database/static-creds/product-static
 ```
 Press `Ctrl+C` to stop and return to the first terminal.
 
+Clean up Database Secrets Engine
+```
+vault secrets disable database
+```
+
+Delete pods
+```
+kubectl delete -f ./yaml/product.yaml
+kubectl delete -f ./yaml/postgres.yaml
+```
+
 Database Credentials from EKS Pod to RDS
 ========================================
-cd ../
+
+Configure dynamic database role in Vault for the RDS instance
+```
+./configure_rds.sh
+```
+
+Test generating dynamic credentials
+```
+vault read database/creds/product
+```
+
+Configure Vault policy
+```
+./configure_dynamic_policy.sh
+```
+
+Deploy the `product-*` pod and check for `RUNNING` status
+```
+kubectl apply -f ./yaml/product.yaml
+```
+
+Save `product` pod name
+```
+PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[0].metadata.name')
+echo $PRODUCT_POD
+```
+
+Exec into the pod and observe that the credentials dynamically change every ~20s
+```
+watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
+```
+Notice the error and no rendering of secrets. Press `Ctrl+C` to stop.
+
+Delete the `product` pod
+```
+kubectl delete -f ./yaml/product.yaml
+```
+
 Generate an ExternalName service definition
 ```
 export RDS_ADDR=$(terraform output rds-address)
@@ -368,12 +419,92 @@ EOF
 
 Check to ensure the RDS endpoint rendered properly in the YAML definition
 ```
-more rds-postgres.yaml
+more rds-postgres.yaml | grep externalName
 ```
 
 Deploy the `ExternalName` service
 ```
 kubectl apply -f rds-postgres.yaml
-kubectl get svc
+kubectl get svc | grep rds-postgres
 ```
 
+Generate a new `product-rds.yaml` file
+```
+cat > product-rds.yaml << EOF
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product
+spec:
+  selector:
+    app: product
+  ports:
+    - name: http
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-rds
+  labels:
+    app: product-rds
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-rds
+  template:
+    metadata:
+      labels:
+        app: product-rds
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "product-rds"
+        vault.hashicorp.com/agent-inject-secret-conf.json: "database/static-creds/product"
+        vault.hashicorp.com/agent-inject-template-conf.json: |
+          {
+            "bind_address": ":9090",
+            {{ with secret "database/static-creds/product-static" -}}
+            "db_connection": "host=${POSTGRES_IP} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
+            {{- end }}
+          }
+    spec:
+      serviceAccountName: product
+      containers:
+        - name: product
+          image: hashicorpdemoapp/product-api:v0.0.14
+          ports:
+            - containerPort: 9090
+          env:
+            - name: "CONFIG_FILE"
+              value: "/vault/secrets/conf.json"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+            periodSeconds: 10
+            failureThreshold: 30
+EOF
+```
+
+Check that the `host` value rendered properly with the AWS FQDN record
+```
+more product-rds.yaml | grep host
+```
+
+Deploy the product service with the RDS database role
+```
+kubectl apply -f product-rds.yaml
+kubectl wait po --for=condition=Ready -l app=product-rds
+```

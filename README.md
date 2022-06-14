@@ -389,13 +389,13 @@ PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[1].metadata.name')
 echo $PRODUCT_POD
 watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
-Hit `Ctrl+C` to stop.
+Press `Ctrl+C` to stop.
 
-### `Optional`: Open another terminal and watch the countdown of the static credential.  When the password is rotated, the database password rendered i the `product-*` pod  is changed at the same time
+### `Optional`: Open another terminal and watch the countdown of the static credential.  When the password is rotated, the database password rendered in the `product-*` pod  is changed at the same time
 ```
-watch -n 1 vault read database/static-creds/postgresql
+watch -n 2 vault read database/static-creds/postgresql
 ```
-Hit `Ctrl+C` to stop and close terminal.
+Press `Ctrl+C` to stop and close terminal.
 
 ## [WIP] Configure Database Credentials from EKS Pod to RDS
 Generate an ExternalName service definition
