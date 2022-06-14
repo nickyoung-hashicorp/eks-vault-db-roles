@@ -81,9 +81,9 @@ scp -i ssh-key.pem ubuntu@$(terraform output vault_ip):/home/ubuntu/root_token .
 
 Install Vault to use the CLI
 ```
-cd ./scripts
+cd scripts/
 chmod +x *.sh
-setup_workstation.sh
+./setup_workstation.sh
 ```
 
 Check that the environment variables were saved properly
