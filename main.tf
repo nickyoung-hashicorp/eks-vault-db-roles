@@ -169,7 +169,7 @@ resource "null_resource" "configure-vault" {
   }
 
   provisioner "file" {
-    source      = "scripts/"
+    source      = "scripts/install_vault.sh"
     destination = "/home/ubuntu/"
 
     connection {

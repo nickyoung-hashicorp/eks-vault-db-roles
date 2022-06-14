@@ -1,0 +1,48 @@
+#!/bin/bash
+# This is the setup script for the workstation container. Use it to set the stage for your terraform training, demo, or lab.
+set -e
+
+# Allow instruqt time to do its thing
+sleep 10
+
+# Source important environment variables
+mkdir -p /root/.local/share/code-server/User
+
+# Set bash as the default shell
+cat <<-EOF > /root/.local/share/code-server/User/settings.json
+{
+    "terminal.integrated.shell.linux": "/bin/bash",
+    "terminal.integrated.fontFamily": "Inconsolata, Consolas, 'Courier New', monospace"
+}
+EOF
+
+# Set the user's working directory with the set-workdir script, then in subsequent challenges the user will always start in that directory.
+mkdir /root/workspace
+/bin/set-workdir /root/workspace
+
+# Set bash as the default shell
+cat <<-EOF > /root/workspace/export-creds.sh
+export AWS_REGION=us-west-2
+EOF
+
+chmod +x *.sh
+
+# Set Terraform Version
+TERRAFORM_VERSION="1.1.9"
+
+# Install desired version of Terraform
+wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+mv terraform /usr/local/bin/terraform
+chmod +x /usr/local/bin/terraform
+rm -f terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+# Store our project ID as a Terraform env var
+export TF_VAR_project=$INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID
+grep $INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID /root/.bashrc || echo "export TF_VAR_project=\"$INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID\"" >> /root/.bashrc
+export GOOGLE_CREDENTIALS=$(echo $INSTRUQT_GCP_PROJECT_GCP_PROJECT_SERVICE_ACCOUNT_KEY | base64 -d | jq 'tostring')
+echo "export GOOGLE_CREDENTIALS=$GOOGLE_CREDENTIALS" >> /root/.bashrc
+source /root/.bashrc
+
+# Update packages
+apt update -y

@@ -7,19 +7,16 @@ This demonstration includes the following:
  - AWS EKS (Elastic Kubernetes Services)
  - Packages: awscli, kubectl, helm, jq, wget
 
-## Deploy Vault, EKS, and AWS resources
+## Deploy Vault, EKS, and RDS
 Clone repository and provision.
 ```sh
 git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 cd eks-vault-db-roles
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
-sleep 5
-tail -f apply.log
-
 ```
-The EKS cluster and RDS database can take 15-20 minutes to provision, so we're running `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
+The EKS cluster and RDS database can take 15-20 minutes to provision, so can run `tail -f apply.log` to check on the real-time status of the apply.  Press `Ctrl+C` to cancel out of the `tail` command.
 
-### Configure Vault
+## Configure Vault
 SSH to the EC2 instance
 ```sh
 ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
@@ -59,7 +56,7 @@ unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
 
 Setup Environment
 ```sh
-echo "export VAULT_TOKEN=$(cat /root/workspace/eks-vault-db-roles/root_token)" >> ~/.bashrc
+echo "export VAULT_TOKEN=$(cat ~/eks-vault-db-roles/root_token)" >> ~/.bashrc
 echo "export VAULT_ADDR=http://$(terraform output vault_ip):8200" >> ~/.bashrc
 echo "export AWS_DEFAULT_REGION=us-west-2" >> ~/.bashrc
 echo "export EKS_CLUSTER=eks-rds-demo"  >> ~/.bashrc
@@ -95,8 +92,6 @@ aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
 kubectl get po -A
 ```
 If you see pods running in the `kube-system` namespace, you are ready to go.
-
-## Install Vault Agent
 
 Install the Vault Agent on EKS using Helm
 ```sh
@@ -158,7 +153,7 @@ vault write database/config/products \
     connection_url="postgresql://{{username}}:{{password}}@${POSTGRES_IP}:5432/products?sslmode=disable" \
     username="postgres" \
     password="password"
-vault write database/roles/product \
+vault write database/roles/products \
     db_name=products \
     creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
         GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
@@ -211,16 +206,16 @@ vault secrets disable database
 
 ### Delete pods
 ```sh
-kubectl delete -f product.yaml
-kubectl delete -f postgres.yaml
+kubectl delete -f ./yaml/product.yaml --grace-period 0 --force
+kubectl delete -f ./yaml/postgres.yaml --grace-period 0 --force
 ```
 
 ## Configure Static Database Roles
 
 ### Deploy Postgres database
 ```sh
-kubectl apply -f postgres.yaml
-kubectl get po
+kubectl apply -f ./yaml/postgres.yaml
+kubectl wait po --for=condition=Ready -l app=postgres
 ```
 
 ### Exec into `postgres-*` pod
@@ -228,8 +223,11 @@ kubectl get po
 PG_POD=$(kubectl get po -o json | jq -r '.items[0].metadata.name')
 echo $PG_POD
 kubectl exec --stdin --tty $PG_POD -- /bin/bash
+```
 
-# Setup Sta$$tic database credential
+Setup static user for Vault
+```sh
+# Setup Static database credential
 export PGPASSWORD=password
 psql -U postgres -c "CREATE ROLE \"static-vault-user\" WITH LOGIN PASSWORD 'password';"
 
@@ -242,6 +240,7 @@ psql -U postgres -c "\du"
 # Exit pod
 exit
 ```
+
 ## Configure Static Database Roles
 ```sh
 vault auth enable kubernetes
@@ -259,9 +258,9 @@ vault write auth/kubernetes/config \
    kubernetes_ca_cert="$KUBE_CA_CERT"
 ```
 
-## Enable and add database role -->
+## Enable and add database role
 
-<!-- ### Enable and configure database secrets engine
+### Enable and configure database secrets engine
 ```sh
 vault secrets enable database
 export POSTGRES_IP=$(kubectl get service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \

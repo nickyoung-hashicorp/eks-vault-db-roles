@@ -1,0 +1,20 @@
+slug: vault-eks-rds
+id: lg1yqcqqokom
+type: track
+title: Vault Database Credentials with AWS EKS and RDS
+teaser: A demonstration of how Vault can interact with database in AWS EKS and RDS.
+description: This track shows how Vault can leverage its database secrets engines
+  to generate dynamic database credentials and rotate passwords through static roles
+  for databases running in EKS as well as a managed service like RDS.
+icon: ""
+tags:
+- vault
+- aws
+- eks
+- rds
+owner: hashicorp
+developers:
+- nyoung@hashicorp.com
+private: true
+published: false
+checksum: "6199153822454430790"
