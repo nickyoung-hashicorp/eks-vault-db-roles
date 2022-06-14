@@ -139,8 +139,6 @@ kubectl wait po --for=condition=Ready -l app=postgres
 
 ```
 
-# SOMETHING IS BROKEN IN CONFIGURING THE DATABASE
-
 Add database role to Vault
 ```sh
 vault secrets enable database
@@ -161,7 +159,7 @@ vault write database/roles/product \
     default_ttl="20s" \
     max_ttl="60s"
 ```
-If this fails with an error that looks like `* error creating database object: error verifying connection: dial tcp: lookup a986ca57f20914c29b53f61ff0b7d960-2128898780.us-west-2.elb.amazonaws.com on 127.0.0.53:53: no such host`, check the EKS security group and open all inbound traffic from anywhere.
+If this fails with an error that looks like `* error creating database object: error verifying connection: dial tcp: lookup a986ca57f20914c29b53f61ff0b7d960-2128898780.us-west-2.elb.amazonaws.com on 127.0.0.53:53: no such host`, check the EKS security group and open all inbound traffic from anywhere to quickly allow the connection.
 
 ### Test generating dynamic credentials
 ```sh
