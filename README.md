@@ -57,18 +57,19 @@ wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION
 unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
 ```
 
-Replace `<root_token>` with the token you copied earlier
+Setup Environment
 ```sh
-export VAULT_TOKEN=$(cat root_token)
-export VAULT_ADDR=http://$(terraform output vault_ip):8200
-echo $VAULT_TOKEN # to check that the root token was saved properly
-echo $VAULT_ADDR # to check that the public IP of Vault was saved properly
-```
+echo "export VAULT_TOKEN=$(cat /root/workspace/eks-vault-db-roles/root_token)" >> ~/.bashrc
+echo "export VAULT_ADDR=http://$(terraform output vault_ip):8200" >> ~/.bashrc
+echo "export AWS_DEFAULT_REGION=us-west-2" >> ~/.bashrc
+echo "export EKS_CLUSTER=eks-rds-demo"  >> ~/.bashrc
+source ~/.bashrc && cd eks-vault-db-roles
 
-Setup local environment
-```sh
-# Define AWS region
-export AWS_DEFAULT_REGION=us-west-2
+# Check that the environment variables were saved properly
+echo $VAULT_TOKEN
+echo $VAULT_ADDR
+echo $AWS_DEFAULT_REGION
+echo $EKS_CLUSTER
 
 # Install awscli
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -88,7 +89,6 @@ chmod 700 get_helm.sh
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 
 # Configure `kubectl`
-export EKS_CLUSTER=eks-rds-demo
 aws eks --region ${AWS_DEFAULT_REGION} update-kubeconfig --name ${EKS_CLUSTER}
 
 # Test EKS cluster
@@ -106,7 +106,11 @@ injector:
    enabled: true
    externalVaultAddr: "${VAULT_ADDR}"
 EOF
-more values.yaml # to ensure Vault's public IP rendered properly
+
+# Check that Vault's public IP rendered properly
+more values.yaml
+
+# Install Vault Agent
 helm install vault -f values.yaml hashicorp/vault --version "0.19.0"
 ```
 
