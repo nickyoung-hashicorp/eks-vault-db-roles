@@ -1,5 +1,7 @@
 #!/bin/bash -v
 
+echo "Installing Vault with a file backend"
+
 wget https://releases.hashicorp.com/vault/1.10.3/vault_1.10.3_linux_amd64.zip
 unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
 
@@ -58,4 +60,20 @@ EOF
 
 sudo chmod 0644 /etc/systemd/system/vault.service
 
+echo "Starting the Vault service..."
 sudo systemctl start vault
+
+sleep 5
+
+export VAULT_ADDR=http://127.0.0.1:8200
+
+echo "Initializing Vault"
+vault operator init -format=json -key-shares=1 -key-threshold=1 > ~/init.json
+
+echo "Unsealing Vault"
+vault operator unseal $(cat ~/init.json | jq -r '.unseal_keys_b64[0]')
+
+echo "Saving root token as a file: ~/root_token"
+cat ~/init.json | jq -r '.root_token' > ~/root_token
+
+echo "Installation complete"
