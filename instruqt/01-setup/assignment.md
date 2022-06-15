@@ -474,13 +474,13 @@ spec:
           {
             "bind_address": ":9090",
             {{ with secret "database/static-creds/product-static" -}}
-            "db_connection": "host=${POSTGRES_IP} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
+            "db_connection": "host=${RDS_ADDR} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
             {{- end }}
           }
     spec:
       serviceAccountName: product
       containers:
-        - name: product
+        - name: product-rds
           image: hashicorpdemoapp/product-api:v0.0.14
           ports:
             - containerPort: 9090
