@@ -20,6 +20,7 @@ EOF
 git clone https://github.com/nickyoung-hashicorp/eks-vault-db-roles.git
 
 # Set scripts as executable
+cd eks-vault-db-roles/
 chmod +x *.sh
 
 # Set the user's working directory with the set-workdir script, then in subsequent challenges the user will always start in that directory.
@@ -50,7 +51,8 @@ echo "export EKS_CLUSTER=eks-rds-demo"  >> ~/.bashrc
 source /root/.bashrc
 
 # Update packages
-apt update -y
+sudo apt update -y && sudo apt install jq -y
+
 
 # Install awscli
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -72,4 +74,4 @@ wget https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION
 unzip -j vault_*_linux_amd64.zip -d /usr/local/bin
 
 # Remove files
-rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
+rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip kubectl

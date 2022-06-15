@@ -10,3 +10,6 @@ more values.yaml
 
 # Install Vault Agent
 helm install vault -f values.yaml hashicorp/vault --version "0.19.0"
+
+# Check `vault-agent-injector-*` pod for `RUNNING` status
+kubectl wait po --for=condition=Ready -l app.kubernetes.io/instance=vault
