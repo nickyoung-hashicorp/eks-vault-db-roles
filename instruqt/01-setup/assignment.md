@@ -33,9 +33,7 @@ timelimit: 86400
 
 ## Provision infrastructure using Terraform
 ```
-cd /root/eks-vault-db-roles
 chmod +x *.sh
-./setup_workstation
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 
@@ -47,19 +45,19 @@ Press `Ctrl+C` to cancel out of the `tail` command once the apply is complete.
 
 Create file with the RDS address and copy to the EC2 instance
 ```
-echo "$(terraform output rds_address)" >> rds_address
-scp -i ssh-key.pem ./rds_address ubuntu@$(terraform output vault_ip):~/rds_address
+echo "$(terraform output -raw rds_address)" >> rds_address
+scp -i ssh-key.pem ./rds_address ubuntu@$(terraform output -raw vault_ip):~/rds_address
 ```
 
 SSH to the EC2 instance
 ```
-ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
+ssh -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip)
 ```
 
 Update packages and install `jq`
 ```
 sudo su
-apt update -y
+apt update -y && apt install jq -y
 ```
 
 Install Vault
@@ -84,7 +82,7 @@ exit
 
 Copy root token from the EC2 instance to the local workstation
 ```
-scp -i ssh-key.pem ubuntu@$(terraform output vault_ip):~/root_token .
+scp -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip):~/root_token .
 ```
 
 ## Setup Local Workstation
@@ -92,7 +90,7 @@ scp -i ssh-key.pem ubuntu@$(terraform output vault_ip):~/root_token .
 Save Vault environment variables
 ```
 export VAULT_TOKEN=$(cat ~/eks-vault-db-roles/root_token)
-export VAULT_ADDR=http://$(terraform output vault_ip):8200
+export VAULT_ADDR=http://$(terraform output -raw vault_ip):8200
 export AWS_DEFAULT_REGION=us-west-2
 export EKS_CLUSTER=eks-rds-demo
 
@@ -423,7 +421,7 @@ Configure Vault policy
 
 Generate a new `product-static.yaml` file
 ```
-export RDS_ADDR=$(terraform output rds_address) && echo $POSTGRES_IP
+export RDS_ADDR=$(terraform output -raw rds_address) && echo $POSTGRES_IP
 cat > product-static.yaml << EOF
 ---
 apiVersion: v1
@@ -518,7 +516,7 @@ Press `Ctrl+C` to stop.
 
 Optional: Open a second terminal, access the EC2 instance, and attempt to login to the Postgres database using the static user
 ```
-ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
+ssh -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip)
 ```
 
 Login to Vault
