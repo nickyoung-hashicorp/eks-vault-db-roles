@@ -35,7 +35,7 @@ timelimit: 86400
 ```
 cd /root/eks-vault-db-roles
 chmod +x *.sh
-./0_setup_workstation
+./setup_workstation
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 
