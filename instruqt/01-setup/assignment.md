@@ -113,7 +113,7 @@ chmod 700 get_helm.sh
 rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
 
 # Check that the environment variables were saved properly
-```
+
 source ~/.bashrc && cd eks-vault-db-roles/
 echo $VAULT_TOKEN
 echo $VAULT_ADDR
@@ -131,6 +131,20 @@ Test EKS cluster
 kubectl get po -A
 ```
 If you see pods running in the `kube-system` namespace, you are ready to go.
+
+Allow all traffic inbound to the EKS cluster for ease of demonstration
+```
+export EKS_SG=$(aws ec2 describe-security-groups \
+    --filters Name=group-name,Values=eks-cluster* | jq -r '.SecurityGroups[] | .GroupId')
+
+aws ec2 authorize-security-group-ingress \
+    --group-id ${EKS_SG} \
+    --protocol all \
+    --port -1 \
+    --cidr 0.0.0.0/0 | jq -r '.Return'
+```
+
+
 
 ## Install the Vault Agent
 
@@ -197,16 +211,13 @@ watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
 Press `Ctrl+C` to stop.
 
-Clean up Database Secrets Engine
+Clean up Database Secrets Engine and K8s objects
 ```
 vault secrets disable database
-```
-
-Delete pods
-```
 kubectl delete -f ./yaml/product.yaml
 kubectl delete -f ./yaml/postgres.yaml
 ```
+Deleting the Postgres deployment can take a couple minutes.
 
 Demonstrate Static Roles within EKS
 ===================================
@@ -352,23 +363,21 @@ watch -n 2 vault read database/static-creds/product-static
 ```
 Press `Ctrl+C` to stop and return to the first terminal.
 
-Clean up Database Secrets Engine
+Clean up Database Secrets Engine and K8s objects
 ```
 vault secrets disable database
-```
-
-Delete pods
-```
-kubectl delete -f ./yaml/product.yaml
+kubectl delete -f ./product-static.yaml
 kubectl delete -f ./yaml/postgres.yaml
 ```
+Deleting the Postgres pod can take a couple minutes.
+
 
 Database Credentials from EKS Pod to RDS
 ========================================
 
 Configure dynamic database role in Vault for the RDS instance
 ```
-./configure_rds.sh
+./configure_rds_dynamic_role.sh
 ```
 
 Test generating dynamic credentials
@@ -384,6 +393,11 @@ Configure Vault policy
 Deploy the `product-*` pod and check for `RUNNING` status
 ```
 kubectl apply -f ./yaml/product.yaml
+```
+
+Notice that there is no `postgres-*` pod running in EKS
+```
+kubectl get po
 ```
 
 Save `product` pod name
@@ -507,4 +521,29 @@ Deploy the product service with the RDS database role
 ```
 kubectl apply -f product-rds.yaml
 kubectl wait po --for=condition=Ready -l app=product-rds
+```
+
+## SCRATCH
+
+Login to Postgres RDS
+```
+psql -h $(terraform output rds-address) -p 5432 -U postgres products
+```
+
+Setup static user for Vault
+```
+# Setup Static database credential
+export PGPASSWORD=password
+
+psql -U postgres -c "CREATE ROLE \"static-vault-user\" WITH LOGIN PASSWORD 'password';"
+
+# Grant associated privileges for the role
+
+psql -U postgres -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"static-vault-user\";"
+
+# Confirm role attributes
+psql -U postgres -c "\du"
+
+# Exit the pod
+exit
 ```

@@ -1,6 +1,8 @@
 read -p "Enable the database secrets engine[]"
 vault secrets enable database
 
+sleep 5
+
 read -p "Save and echo the Postgres pod's hostname[]"
 export POSTGRES_IP=$(kubectl get service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' \
    postgres)
