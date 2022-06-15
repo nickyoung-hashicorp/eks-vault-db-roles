@@ -35,6 +35,7 @@ timelimit: 86400
 ```
 cd /root/eks-vault-db-roles
 chmod +x *.sh
+./0_setup_workstation
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 
@@ -61,14 +62,14 @@ sudo su
 apt update -y
 ```
 
-Install PostgreSQL client
-```
-./install_postgres_client.sh
-```
-
 Install Vault
 ```
 ./install_vault.sh
+```
+
+*Optional*: Install PostgreSQL client for `Static Roles - EKS Pod to RDS` section
+```
+./install_postgres_client.sh
 ```
 
 Exit from root
@@ -151,7 +152,7 @@ kubectl apply -f ./yaml/postgres.yaml && kubectl wait po --for=condition=Ready -
 
 Configure dynamic database role in Vault
 ```
-./configure_dynamic_role.sh
+./1_dynamic_role.sh
 ```
 
 Test generating dynamic credentials
@@ -161,7 +162,7 @@ vault read database/creds/product
 
 Configure Vault policy
 ```
-./configure_dynamic_policy.sh
+./2_dynamic_policy.sh
 ```
 
 Deploy the `product` pod and check for `RUNNING` status
@@ -222,7 +223,7 @@ exit
 
 Configure static database role in Vault
 ```
-./configure_static_role.sh
+./3_static_role.sh
 ```
 If this fails, wait several seconds and re-run this script.  Sometimes it can take several seconds for the Postgres database to respond to the Vault configuration setup.
 
@@ -233,7 +234,7 @@ vault read database/static-creds/product-static
 
 Configure Vault policy
 ```
-./configure_static_policy.sh
+./4_static_policy.sh
 ```
 
 Generate a new `product-static.yaml` file
@@ -340,12 +341,12 @@ kubectl delete -f ./yaml/postgres.yaml
 Deleting the Postgres pod can take a couple minutes.
 
 
-4) Dynamic Role - EKS Pod to RDS
-================================
+4) Dynamic Credentials - EKS Pod to RDS
+=======================================
 
 Configure dynamic database role in Vault for the RDS instance
 ```
-./configure_rds_dynamic_role.sh
+./5_rds_dynamic_role.sh
 ```
 
 Test generating dynamic credentials on the RDS database
@@ -355,7 +356,7 @@ vault read database/creds/product
 
 Configure Vault policy
 ```
-./configure_dynamic_policy.sh
+./6_rds_dynamic_policy.sh
 ```
 
 Deploy the `product-*` pod and check for `RUNNING` status
@@ -384,7 +385,7 @@ vault secrets disable database
 kubectl delete -f ./yaml/product.yaml
 ```
 
-1) Static Roles - EKS Pod to RDS
+5) Static Role - EKS Pod to RDS
 ================================
 
 # Setup Postgres (RDS) with static user
@@ -407,7 +408,7 @@ logout
 
 Configure static database role in Vault
 ```
-./configure_rds_static_role.sh
+./7_rds_static_role.sh
 ```
 
 Test viewing the static credentials
@@ -417,7 +418,7 @@ vault read database/static-creds/product-static
 
 Configure Vault policy
 ```
-./configure_static_policy.sh
+./8_rds_static_policy.sh
 ```
 
 Generate a new `product-static.yaml` file
