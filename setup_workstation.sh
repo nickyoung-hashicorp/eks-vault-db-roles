@@ -19,4 +19,4 @@ chmod 700 get_helm.sh
 ./get_helm.sh
 
 echo "Remove files"
-rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip
+rm -rf aws awscliv2.zip get_helm.sh vault_*_linux_amd64.zip kubectl

@@ -19,7 +19,7 @@ tabs:
 - title: Text Editor
   type: code
   hostname: workstation
-  path: /root/workspace
+  path: /root/eks-vault-db-roles
 - title: Cloud Consoles
   type: service
   hostname: cloud-client
@@ -33,7 +33,6 @@ timelimit: 86400
 
 ## Provision infrastructure using Terraform
 ```
-chmod +x *.sh
 terraform init && nohup terraform apply -auto-approve -parallelism=20 > apply.log &
 ```
 
