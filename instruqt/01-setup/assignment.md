@@ -64,12 +64,12 @@ apt update -y && apt install curl gpg gnupg2 software-properties-common apt-tran
 
 Install Vault
 ```
-./install_vault.sh
+./1_install_vault.sh
 ```
 
 *Optional*: Install PostgreSQL client for `Static Roles - EKS Pod to RDS` section
 ```
-./install_postgres_client.sh
+./2_install_postgres_client.sh
 ```
 
 Exit from root
@@ -416,13 +416,12 @@ Press `q` to quit.
 
 Logout of the Postgres database
 ```
-logout
 \q
 ```
 
 Configure static database role in Vault
 ```
-./7_rds_static_role.sh
+./3_rds_static_role.sh
 ```
 
 Test viewing the static credentials
@@ -432,7 +431,12 @@ vault read database/static-creds/product
 
 Configure Vault policy
 ```
-./8_rds_static_policy.sh
+./4_rds_static_policy.sh
+```
+
+Exit the EC2 instance
+```
+exit
 ```
 
 Generate a new `product.yaml` file
@@ -511,24 +515,25 @@ Check that the `host` value rendered properly with the AWS FQDN record of the RD
 more product.yaml | grep host=terraform
 ```
 
-Deploy the product service with the static database role
+Deploy the `product` pod with the static database role
 ```
 kubectl apply -f product.yaml && kubectl wait po --for=condition=Ready -l app=product
 ```
 
 Observe how the database password in the `product` pod dynamically changes every ~20 seconds
 ```
-PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[0].metadata.name')
-echo $PRODUCT_POD
+PRODUCT_POD=$(kubectl get po -o json | jq -r '.items[0].metadata.name') && echo $PRODUCT_POD
 watch -n 2 kubectl exec $PRODUCT_POD  -- cat /vault/secrets/conf.json
 ```
-Press `Ctrl+C` to stop.
 
-Optional: Open a second terminal and watch the countdown of the static credential.  When the password is rotated, the database psasword rendered in the `product` pod is chnaged at the same time
+Open a second terminal and watch the countdown of the static credential.  When the password is rotated, return to the first terminal and notice the database psasword rendered in the `product` pod has also changed
 ```
+cd ~/eks-vault-db-roles
+export VAULT_TOKEN=$(cat ~/eks-vault-db-roles/root_token)
+export VAULT_ADDR=http://$(terraform output vault_ip):8200
 watch -n 2 vault read database/static-creds/product
 ```
-Press `Ctrl+C` to stop.
+Press `Ctrl+C` to stop the watches in both terminals.
 
 Optional: Open a second terminal, access the EC2 instance, and attempt to login to the Postgres database using the static user
 ```
@@ -538,13 +543,13 @@ ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 Login to Vault
 ```
 export VAULT_ADDR=http://127.0.0.1:8200
-vault login $(cat root_token)
+export VAULT_TOKEN=$(cat root_token)
 ```
 
 Retrieve current Static Credentials
 ```
 vault read database/static-creds/product-static
-read PG_USER PG_PASSWORD < <(echo $(vault read -format=json database/static-creds/product-static | jq -r '.data.username, .data.password') )
+read PG_USER PG_PASSWORD < <(echo $(vault read -format=json database/static-creds/product | jq -r '.data.username, .data.password') )
 echo $PG_USER
 echo $PG_PASSWORD
 
@@ -560,7 +565,6 @@ Press `q` to quit.
 
 Quit out of Postgres
 ```
-logout
 \q
 ```
 
@@ -581,7 +585,6 @@ PGPASSWORD=$PG_PASSWORD psql --host=$(cat rds_address) --port=5432 --username=$P
 
 Quit out of Postgres
 ```
-logout
 \q
 ```
 
