@@ -53,10 +53,10 @@ SSH to the EC2 instance
 ssh -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip)
 ```
 
-Update packages and install `jq`
+Update and install packages
 ```
 sudo su
-apt update -y && apt install jq -y
+apt update -y && apt install curl gpg gnupg2 software-properties-common apt-transport-https lsb-release ca-certificates jq -y
 ```
 
 Install Vault
