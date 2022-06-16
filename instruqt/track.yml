@@ -1,5 +1,5 @@
-slug: vault-eks-rds
-id: wiwsucowa8y7
+slug: vault-eks-rds-1
+id: unw4gcmqsvry
 type: track
 title: Vault Database Credentials with AWS EKS and RDS
 teaser: A demonstration of how Vault can interact with database in AWS EKS and RDS.
@@ -17,4 +17,4 @@ developers:
 - nyoung@hashicorp.com
 private: true
 published: false
-checksum: "8508195343222105225"
+checksum: "17793405453355054018"

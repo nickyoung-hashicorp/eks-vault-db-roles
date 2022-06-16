@@ -1,6 +1,6 @@
 ---
 slug: setup
-id: zsqgmr1yodrw
+id: rvxqxily3vyf
 type: challenge
 title: Setup the environment
 teaser: This challenge walks through deploying and configuring a single Vault node,
@@ -229,7 +229,7 @@ If this fails, wait several seconds and re-run this script.  Sometimes it can ta
 
 Test viewing the static credentials
 ```
-vault read database/static-creds/product-static
+vault read database/static-creds/product
 ```
 
 Configure Vault policy
@@ -548,7 +548,7 @@ export VAULT_TOKEN=$(cat root_token)
 
 Retrieve current Static Credentials
 ```
-vault read database/static-creds/product-static
+vault read database/static-creds/product
 read PG_USER PG_PASSWORD < <(echo $(vault read -format=json database/static-creds/product | jq -r '.data.username, .data.password') )
 echo $PG_USER
 echo $PG_PASSWORD
