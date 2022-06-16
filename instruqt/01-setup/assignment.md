@@ -44,13 +44,13 @@ Press `Ctrl+C` to cancel out of the `tail` command once the apply is complete.
 
 Create file with the RDS address and copy to the EC2 instance
 ```
-echo "$(terraform output -raw rds_address)" >> rds_address
-scp -i ssh-key.pem ./rds_address ubuntu@$(terraform output -raw vault_ip):~/rds_address
+echo "$(terraform output rds_address)" >> rds_address
+scp -i ssh-key.pem ./rds_address ubuntu@$(terraform output vault_ip):~/rds_address
 ```
 
 SSH to the EC2 instance
 ```
-ssh -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip)
+ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 ```
 
 Update and install packages
@@ -81,7 +81,7 @@ exit
 
 Copy root token from the EC2 instance to the local workstation
 ```
-scp -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip):~/root_token .
+scp -i ssh-key.pem ubuntu@$(terraform output vault_ip):~/root_token .
 ```
 
 ## Setup Local Workstation
@@ -89,7 +89,7 @@ scp -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip):~/root_token .
 Save Vault environment variables
 ```
 export VAULT_TOKEN=$(cat ~/eks-vault-db-roles/root_token)
-export VAULT_ADDR=http://$(terraform output -raw vault_ip):8200
+export VAULT_ADDR=http://$(terraform output vault_ip):8200
 export AWS_DEFAULT_REGION=us-west-2
 export EKS_CLUSTER=eks-rds-demo
 
@@ -387,18 +387,32 @@ kubectl delete -f ./yaml/product.yaml
 
 # Setup Postgres (RDS) with static user
 
+SSH to the EC2 instance
+```
+ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
+```
+
+Export environment variables
+```
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=$(cat root_token)
+```
+
 Login to the Postgres database running in RDS
 ```
-psql --host=$(cat rds_address) --port=5432 --username=postgres --password --dbname=products
+PGPASSWORD=password psql --host=$(cat rds_address) --port=5432 --username=postgres --dbname=products
 ```
-Type `password` then press **Enter** when prompted.
 
 Setup static user for Vault
 ```
-export PGPASSWORD=password
 CREATE USER "static-vault-user" WITH PASSWORD 'password';
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "static-vault-user";
 \du
+```
+Press `q` to quit.
+
+Logout of the Postgres database
+```
 logout
 \q
 ```
@@ -410,7 +424,7 @@ Configure static database role in Vault
 
 Test viewing the static credentials
 ```
-vault read database/static-creds/product-static
+vault read database/static-creds/product
 ```
 
 Configure Vault policy
@@ -418,10 +432,10 @@ Configure Vault policy
 ./8_rds_static_policy.sh
 ```
 
-Generate a new `product-static.yaml` file
+Generate a new `product.yaml` file
 ```
-export RDS_ADDR=$(terraform output -raw rds_address) && echo $POSTGRES_IP
-cat > product-static.yaml << EOF
+export RDS_ADDR=$(terraform output rds_address) && echo $RDS_ADDR
+cat > product.yaml << EOF
 ---
 apiVersion: v1
 kind: Service
@@ -445,26 +459,26 @@ automountServiceAccountToken: true
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-static
+  name: product
   labels:
-    app: product-static
+    app: product
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: product-static
+      app: product
   template:
     metadata:
       labels:
-        app: product-static
+        app: product
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "product-static"
+        vault.hashicorp.com/role: "product"
         vault.hashicorp.com/agent-inject-secret-conf.json: "database/static-creds/product"
         vault.hashicorp.com/agent-inject-template-conf.json: |
           {
             "bind_address": ":9090",
-            {{ with secret "database/static-creds/product-static" -}}
+            {{ with secret "database/static-creds/product" -}}
             "db_connection": "host=${RDS_ADDR} port=5432 user={{ .Data.username }} password={{ .Data.password }} dbname=products sslmode=disable"
             {{- end }}
           }
@@ -491,12 +505,12 @@ EOF
 
 Check that the `host` value rendered properly with the AWS FQDN record of the RDS endpoint
 ```
-more product-static.yaml | grep host=terraform
+more product.yaml | grep host=terraform
 ```
 
 Deploy the product service with the static database role
 ```
-kubectl apply -f product-static.yaml && kubectl wait po --for=condition=Ready -l app=product-static
+kubectl apply -f product.yaml && kubectl wait po --for=condition=Ready -l app=product
 ```
 
 Observe how the database password in the `product` pod dynamically changes every ~20 seconds
@@ -509,13 +523,13 @@ Press `Ctrl+C` to stop.
 
 Optional: Open a second terminal and watch the countdown of the static credential.  When the password is rotated, the database psasword rendered in the `product` pod is chnaged at the same time
 ```
-watch -n 2 vault read database/static-creds/product-static
+watch -n 2 vault read database/static-creds/product
 ```
 Press `Ctrl+C` to stop.
 
 Optional: Open a second terminal, access the EC2 instance, and attempt to login to the Postgres database using the static user
 ```
-ssh -i ssh-key.pem ubuntu@$(terraform output -raw vault_ip)
+ssh -i ssh-key.pem ubuntu@$(terraform output vault_ip)
 ```
 
 Login to Vault
@@ -554,7 +568,7 @@ PGPASSWORD=$PG_PASSWORD psql --host=$(cat rds_address) --port=5432 --username=$P
 
 Test once more by getting the current credentials and logging in
 ```
-read PG_USER PG_PASSWORD < <(echo $(vault read -format=json database/static-creds/product-static | jq -r '.data.username, .data.password') )
+read PG_USER PG_PASSWORD < <(echo $(vault read -format=json database/static-creds/product | jq -r '.data.username, .data.password') )
 echo $PG_USER
 echo $PG_PASSWORD
 
@@ -576,7 +590,7 @@ exit
 Clean up Database Secrets Engine and K8s objects
 ```
 vault secrets disable database
-kubectl delete -f ./product-static.yaml
+kubectl delete -f product.yaml
 ```
 
 6) Clean Up

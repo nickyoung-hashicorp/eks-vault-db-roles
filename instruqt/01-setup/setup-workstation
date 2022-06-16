@@ -26,17 +26,6 @@ chmod +x *.sh
 # Set the user's working directory with the set-workdir script, then in subsequent challenges the user will always start in that directory.
 /bin/set-workdir /root/eks-vault-db-roles
 
-
-# Set Terraform Version
-TERRAFORM_VERSION="1.1.9"
-
-# Install desired version of Terraform
-wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-mv terraform /usr/local/bin/terraform
-chmod +x /usr/local/bin/terraform
-rm -f terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-
 # Store our project ID as a Terraform env var
 export TF_VAR_project=$INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID
 grep $INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID /root/.bashrc || echo "export TF_VAR_project=\"$INSTRUQT_GCP_PROJECT_GCP_PROJECT_PROJECT_ID\"" >> /root/.bashrc

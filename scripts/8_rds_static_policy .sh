@@ -1,11 +1,11 @@
-cat > product-static.hcl << EOF
-path "database/static-creds/product-static" {
+cat > product.hcl << EOF
+path "database/static-creds/product" {
   capabilities = ["read"]
 }
 EOF
-vault policy write product-static ./product-static.hcl
-vault write auth/kubernetes/role/product-static \
+vault policy write product ./product.hcl
+vault write auth/kubernetes/role/product \
     bound_service_account_names=product \
     bound_service_account_namespaces=default \
-    policies=product-static \
+    policies=product \
     ttl=1h
